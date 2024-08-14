@@ -6,7 +6,7 @@
 
 #pragma ctrlchar '\'
 
-new const PLUGIN_VERSION[] = "1.0";
+new const PLUGIN_VERSION[] = "1.1";
 new const PLUGIN_NAME[] = "BLOCK FAKE STEAMID";
 new const PLUGIN_AUTHOR[] = "Karaulov";
 
@@ -142,6 +142,7 @@ public steam_found(const id)
 			replace_all(banstr,charsmax(banstr),"[username]",username);
 			replace_all(banstr,charsmax(banstr),"[ip]",userip);
 			replace_all(banstr,charsmax(banstr),"[steamid]",userauth);
+			fix_colors(banstr, charsmax(banstr));
 			client_print_color(0, print_team_red, "%s", banstr);
 		}
 
@@ -192,6 +193,7 @@ public steam_not_found(const id)
 			replace_all(banstr,charsmax(banstr),"[username]",username);
 			replace_all(banstr,charsmax(banstr),"[ip]",userip);
 			replace_all(banstr,charsmax(banstr),"[steamid]",userauth);
+			fix_colors(banstr, charsmax(banstr));
 			client_print_color(0, print_team_red, "%s", banstr);
 		}
 
@@ -243,4 +245,12 @@ stock trim_to_dir(path[])
 			break;
 		}
 	}
+}
+
+stock fix_colors(str[], len)
+{
+	replace_all(str, len, "^1", "\x01");
+	replace_all(str, len, "^2", "\x02");
+	replace_all(str, len, "^3", "\x03");
+	replace_all(str, len, "^4", "\x04");
 }
