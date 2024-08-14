@@ -1,4 +1,6 @@
-	
+Требования: Reapi + Rechecker, Reunion установленные выше amxmodx в metamod/plugins.ini
+
+ 
 Настройки находятся по пути cstrike\addons\amxmodx\configs\plugins\unreal_nosteam_blocker.cfg.ini
 (конфиг создается автоматически при первом запуске)
 
