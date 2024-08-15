@@ -6,7 +6,7 @@
 
 #pragma ctrlchar '\'
 
-new const PLUGIN_VERSION[] = "1.1";
+new const PLUGIN_VERSION[] = "1.2";
 new const PLUGIN_NAME[] = "BLOCK FAKE STEAMID";
 new const PLUGIN_AUTHOR[] = "Karaulov";
 
@@ -184,7 +184,7 @@ public steam_not_found(const id)
 		get_user_ip(id, userip, charsmax(userip), true);
 		new userauth[64];
 		get_user_authid(id, userauth, charsmax(userauth));
-		log_to_file("unreal_fakesteamid_detector.log", "[LOG] User %s [steamid: %s] [ip: %s] [id: %s] connected with FakeSteam client(emulate Steam)", username, userid, userip, userid);
+		log_to_file("unreal_fakesteamid_detector.log", "[LOG] User %s [steamid: %s] [ip: %s] [id: %s] connected with FakeSteam client(emulate Steam)", username, userauth, userip, userid);
 		
 		if (g_sFakeSteamHelloString[0] != EOS)
 		{
