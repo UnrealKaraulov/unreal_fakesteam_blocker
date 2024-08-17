@@ -6,12 +6,17 @@
 
 #pragma ctrlchar '\'
 
-new const PLUGIN_VERSION[] = "1.2";
+new const PLUGIN_VERSION[] = "1.3";
 new const PLUGIN_NAME[] = "BLOCK FAKE STEAMID";
 new const PLUGIN_AUTHOR[] = "Karaulov";
 
 new QueryFileHook:g_hFiles[2];
-new bool:g_bIsUserSteam[MAX_PLAYERS + 1];
+new bool:g_bIsUserSteam[MAX_PLAYERS + 1] = {false, ...};
+new bool:g_bIsUserSteamBadKey[MAX_PLAYERS + 1] = {false, ...};
+
+new const Float:g_fDropTimeOut = 1.0;
+new Float:g_fTimeOut = 60.0;
+new Float:g_fLastPMoveTime[MAX_PLAYERS + 1] = {0.0, ...};
 
 new g_sClientDropString[MAX_PLAYERS + 1][256];
 new g_sFakeSteamBanString[256] = "amx_ban #[userid] 1000 'Fake Steam client emulator detected'";
@@ -20,8 +25,13 @@ new g_sFakeSteamDropString[256] = "Please close Steam or use original Steam cs 1
 new g_sFakeNoSteamBanString[256] = "amx_ban #[userid] 1000 'SteamID Changer detected'";
 new g_sFakeNoSteamHelloString[256] = "User '[username]' join with SteamID Changer";
 new g_sFakeNoSteamDropString[256] = "Please remove SteamID Changer and use original Steam cs 1.6 client";
+new g_sFastDropString[256] = "Sorry. You has big lag and dropped from server.";
+new g_sDropAlreadyFoundString[256] = "Please wait %d minutes because your steamid is used!";
 
-
+public plugin_init()
+{
+	bind_pcvar_float(get_cvar_pointer("sv_timeout"), g_fTimeOut);
+}
 
 public plugin_precache()
 {
@@ -90,6 +100,17 @@ public plugin_precache()
 		g_sFakeNoSteamDropString[0] = EOS;
 	}
 
+	tmpBool = false;
+	cfg_read_bool("general", "fast_lagger_drop", tmpBool, tmpBool);
+	cfg_read_str("general", "fast_lagger_drop_string", g_sFastDropString, g_sFastDropString, charsmax(g_sFastDropString));
+	
+	if (!tmpBool) 
+	{
+		g_sFastDropString[0] = EOS;
+	}
+
+	cfg_read_str("general", "drop_already_found_string", g_sDropAlreadyFoundString, g_sDropAlreadyFoundString, charsmax(g_sDropAlreadyFoundString));
+
 	tmpBool = true;
 	cfg_read_bool("general", "hello_fake_nosteam", tmpBool, tmpBool);
 	cfg_read_str("general", "hello_fake_nosteam_string", g_sFakeNoSteamHelloString, g_sFakeNoSteamHelloString, charsmax(g_sFakeNoSteamHelloString));
@@ -101,6 +122,12 @@ public plugin_precache()
 
 	g_hFiles[0] = RegisterQueryFile("./../../../appmanifest_10.acf", "steam_found", RES_TYPE_HASH_ANY);
 	g_hFiles[1] = RegisterQueryFile("./../../../appmanifest_10.acf", "steam_not_found", RES_TYPE_MISSING);
+
+
+	if (g_sFastDropString[0] != EOS)
+	{
+		RegisterHookChain(RG_PM_Move, "PM_Move_Pre", .post = false);
+	}
 }
 
 public plugin_end()
@@ -109,32 +136,104 @@ public plugin_end()
 	UnRegisterQueryFile(g_hFiles[1]);
 }
 
-public client_authorized(id)
+public client_authorized(id, const authid[])
 {
-	g_bIsUserSteam[id] = is_user_steam(id);
+	g_bIsUserSteam[id] = is_user_steam(id) || containi(authid, "pending") >= 0;
+	g_bIsUserSteamBadKey[id] = false;
+	g_fLastPMoveTime[id] = 0.0;
+
+	if (!g_bIsUserSteam[id])
+	{
+		new testkey[256];
+		REU_GetAuthKey(id, testkey, charsmax(testkey));
+		if (REU_GetProtocol(id) == 48 && REU_GetAuthtype(id) == CA_TYPE_DPROTO && testkey[0] == EOS)
+		{
+			g_bIsUserSteamBadKey[id] = true;
+		}
+	}
+}
+
+public PM_Move_Pre(const id)
+{
+	if (id > 0 && id <= MaxClients && g_fLastPMoveTime[id] != -1.0)
+	{	
+		if (g_fLastPMoveTime[id] > 0.0)
+		{
+			if (floatabs(get_gametime() - g_fLastPMoveTime[id]) > g_fDropTimeOut)
+			{
+				log_player_to_file(id, "dropped due to timeout[fast lagger drop]",false,true);
+				copy(g_sClientDropString[id],charsmax(g_sClientDropString[]), g_sFastDropString);
+				set_task(0.1, "drop_client_delayed", id);
+				log_to_file("unreal_fakesteamid_detector.log", "[DROP] %s", g_sClientDropString[id]);
+				g_fLastPMoveTime[id] = -1.0;
+				return HC_CONTINUE;
+			}
+		}
+
+		g_fLastPMoveTime[id] = get_gametime();
+	}
+	return HC_CONTINUE;
 }
 
 public client_disconnected(id)
 {
 	remove_task(id);
+	g_fLastPMoveTime[id] = 0.0;
 }
 
 public steam_found(const id) 
 {
-	if (!g_bIsUserSteam[id])
+	if (!g_bIsUserSteam[id] && !is_user_steam(id))
 	{
-		static banstr[256];
+		if (g_bIsUserSteamBadKey[id])
+		{
+			log_player_to_file(id, "connected with empty authkey, steamid already is used.");
+			formatex(g_sClientDropString[id],charsmax(g_sClientDropString[]), g_sDropAlreadyFoundString, floatround(g_fTimeOut / 60.0));
+			set_task(0.1, "drop_client_delayed", id);
+			log_to_file("unreal_fakesteamid_detector.log", "[DROP] %s", g_sClientDropString[id]);
+		}
+		else 
+		{
+			log_player_to_file(id, "connected with SteamId Changer", true);
+		}
+	}
+}
 
-		new userid[16];
-		formatex(userid, charsmax(userid), "%i", get_user_userid(id));
-		new username[33];
-		get_user_name(id, username, charsmax(username));
-		new userip[16];
-		get_user_ip(id, userip, charsmax(userip), true);
-		new userauth[64];
-		get_user_authid(id, userauth, charsmax(userauth));
-		log_to_file("unreal_fakesteamid_detector.log", "[LOG] User %s [steamid: %s] [ip: %s] [id: %s] connected with SteamId Changer", username, userid, userip, userid);
-		
+public steam_not_found(const id) 
+{
+	if (g_bIsUserSteam[id])
+	{
+		log_player_to_file(id, "connected with FakeSteam client(emulate Steam)",false,true);
+	}
+}
+
+
+public drop_client_delayed(id)
+{
+	if (is_user_connected(id))
+	{
+		static cheat[64];
+		formatex(cheat, charsmax(cheat), "Error: %s", g_sClientDropString[id]);
+		rh_drop_client(id, cheat);
+	}
+}
+
+log_player_to_file(id, str[], bool:fake_nosteam = false, bool:fake_steam = false)
+{
+	new userid[16];
+	formatex(userid, charsmax(userid), "%i", get_user_userid(id));
+	new username[33];
+	get_user_name(id, username, charsmax(username));
+	new userip[16];
+	get_user_ip(id, userip, charsmax(userip), true);
+	new userauth[64];
+	get_user_authid(id, userauth, charsmax(userauth));
+	log_to_file("unreal_fakesteamid_detector.log", "[LOG] User %s [steamid: %s] [ip: %s] [id: %s] %s", username, userid, userip, userid,str);
+
+	static banstr[256];
+	
+	if (fake_nosteam)
+	{
 		if (g_sFakeNoSteamHelloString[0] != EOS)
 		{
 			copy(banstr,charsmax(banstr), g_sFakeNoSteamHelloString);
@@ -168,24 +267,8 @@ public steam_found(const id)
 			log_to_file("unreal_fakesteamid_detector.log", "[DROP] %s", g_sClientDropString[id]);
 		}
 	}
-}
-
-public steam_not_found(const id) 
-{
-	if (g_bIsUserSteam[id])
+	else if (fake_steam)
 	{
-		static banstr[256];
-
-		new userid[16];
-		formatex(userid, charsmax(userid), "%i", get_user_userid(id));
-		new username[33];
-		get_user_name(id, username, charsmax(username));
-		new userip[16];
-		get_user_ip(id, userip, charsmax(userip), true);
-		new userauth[64];
-		get_user_authid(id, userauth, charsmax(userauth));
-		log_to_file("unreal_fakesteamid_detector.log", "[LOG] User %s [steamid: %s] [ip: %s] [id: %s] connected with FakeSteam client(emulate Steam)", username, userauth, userip, userid);
-		
 		if (g_sFakeSteamHelloString[0] != EOS)
 		{
 			copy(banstr,charsmax(banstr), g_sFakeSteamHelloString);
@@ -218,17 +301,6 @@ public steam_not_found(const id)
 			set_task(0.1, "drop_client_delayed", id);
 			log_to_file("unreal_fakesteamid_detector.log", "[DROP] %s", g_sClientDropString[id]);
 		}
-	}
-}
-
-
-public drop_client_delayed(id)
-{
-	if (is_user_connected(id))
-	{
-		static cheat[64];
-		formatex(cheat, charsmax(cheat), "Error: %s", g_sClientDropString[id]);
-		rh_drop_client(id, cheat);
 	}
 }
 
