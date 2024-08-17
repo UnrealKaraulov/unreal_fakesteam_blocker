@@ -6,7 +6,7 @@
 
 #pragma ctrlchar '\'
 
-new const PLUGIN_VERSION[] = "1.3";
+new const PLUGIN_VERSION[] = "1.4";
 new const PLUGIN_NAME[] = "BLOCK FAKE STEAMID";
 new const PLUGIN_AUTHOR[] = "Karaulov";
 
@@ -27,6 +27,8 @@ new g_sFakeNoSteamHelloString[256] = "User '[username]' join with SteamID Change
 new g_sFakeNoSteamDropString[256] = "Please remove SteamID Changer and use original Steam cs 1.6 client";
 new g_sFastDropString[256] = "Sorry. You has big lag and dropped from server.";
 new g_sDropAlreadyFoundString[256] = "Please wait %d minutes because your steamid is used!";
+
+#define CHECK_TIMEOUT_MAGIC 1000
 
 public plugin_init()
 {
@@ -141,6 +143,12 @@ public client_authorized(id, const authid[])
 	g_bIsUserSteam[id] = is_user_steam(id) || containi(authid, "pending") >= 0;
 	g_bIsUserSteamBadKey[id] = false;
 	g_fLastPMoveTime[id] = 0.0;
+	remove_task(id + CHECK_TIMEOUT_MAGIC);
+
+	if (g_sFastDropString[0] != EOS)
+	{
+		set_task(0.5, "fast_lagger_check_task", id + CHECK_TIMEOUT_MAGIC);
+	}
 
 	if (!g_bIsUserSteam[id])
 	{
@@ -151,6 +159,32 @@ public client_authorized(id, const authid[])
 			g_bIsUserSteamBadKey[id] = true;
 		}
 	}
+}
+
+public fast_lagger_check_task(idx)
+{
+	new id = idx - CHECK_TIMEOUT_MAGIC;
+
+	if (id > 0 && id <= MaxClients && g_fLastPMoveTime[id] != -1.0)
+	{	
+		if (g_fLastPMoveTime[id] > 0.0)
+		{
+			if (floatabs(get_gametime() - g_fLastPMoveTime[id]) > g_fDropTimeOut)
+			{
+				if (is_user_connected(id))
+				{
+					log_player_to_file(id, "dropped due to timeout[fast lagger drop]",false,true);
+					copy(g_sClientDropString[id],charsmax(g_sClientDropString[]), g_sFastDropString);
+					set_task(0.1, "drop_client_delayed", id);
+					log_to_file("unreal_fakesteamid_detector.log", "[DROP] %s", g_sClientDropString[id]);
+					g_fLastPMoveTime[id] = -1.0;
+				}
+				return;
+			}
+		}
+	}
+
+	set_task(0.5, "fast_lagger_check_task", id + CHECK_TIMEOUT_MAGIC);
 }
 
 public PM_Move_Pre(const id)
@@ -178,6 +212,7 @@ public PM_Move_Pre(const id)
 public client_disconnected(id)
 {
 	remove_task(id);
+	remove_task(id + CHECK_TIMEOUT_MAGIC);
 	g_fLastPMoveTime[id] = 0.0;
 }
 
