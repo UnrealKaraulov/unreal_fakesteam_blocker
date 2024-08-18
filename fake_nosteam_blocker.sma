@@ -6,7 +6,7 @@
 
 #pragma ctrlchar '\'
 
-new const PLUGIN_VERSION[] = "1.4";
+new const PLUGIN_VERSION[] = "1.5";
 new const PLUGIN_NAME[] = "BLOCK FAKE STEAMID";
 new const PLUGIN_AUTHOR[] = "Karaulov";
 
@@ -138,9 +138,12 @@ public plugin_end()
 	UnRegisterQueryFile(g_hFiles[1]);
 }
 
-public client_authorized(id, const authid[])
+public client_authorized(id/*, const authid[]*/)
 {
-	g_bIsUserSteam[id] = is_user_steam(id) || containi(authid, "pending") >= 0;
+	new auth[64];
+	get_user_authid(id,auth,charsmax(auth));
+	
+	g_bIsUserSteam[id] = is_user_steam(id) || containi(auth, "pending") >= 0;
 	g_bIsUserSteamBadKey[id] = false;
 	g_fLastPMoveTime[id] = 0.0;
 	remove_task(id + CHECK_TIMEOUT_MAGIC);
@@ -263,7 +266,7 @@ log_player_to_file(id, str[], bool:fake_nosteam = false, bool:fake_steam = false
 	get_user_ip(id, userip, charsmax(userip), true);
 	new userauth[64];
 	get_user_authid(id, userauth, charsmax(userauth));
-	log_to_file("unreal_fakesteamid_detector.log", "[LOG] User %s [steamid: %s] [ip: %s] [id: %s] %s", username, userid, userip, userid,str);
+	log_to_file("unreal_fakesteamid_detector.log", "[LOG] User %s [steamid: %s] [ip: %s] [id: %s] %s", username, userauth, userip, userid,str);
 
 	static banstr[256];
 	
