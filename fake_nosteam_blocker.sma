@@ -6,7 +6,7 @@
 
 #pragma ctrlchar '\'
 
-new const PLUGIN_VERSION[] = "1.5";
+new const PLUGIN_VERSION[] = "1.6";
 new const PLUGIN_NAME[] = "BLOCK FAKE STEAMID";
 new const PLUGIN_AUTHOR[] = "Karaulov";
 
@@ -27,6 +27,7 @@ new g_sFakeNoSteamHelloString[256] = "User '[username]' join with SteamID Change
 new g_sFakeNoSteamDropString[256] = "Please remove SteamID Changer and use original Steam cs 1.6 client";
 new g_sFastDropString[256] = "Sorry. You has big lag and dropped from server.";
 new g_sDropAlreadyFoundString[256] = "Please wait %d minutes because your steamid is used!";
+new g_sSteamDetectFile[256] = "../../common/Half-Life/valve/maps/c4a1.bsp";
 
 #define CHECK_TIMEOUT_MAGIC 1000
 
@@ -121,9 +122,10 @@ public plugin_precache()
 		g_sFakeNoSteamHelloString[0] = EOS;
 	}
 
+	cfg_read_str("general", "steam_detect_path", g_sSteamDetectFile, g_sSteamDetectFile, charsmax(g_sSteamDetectFile));
 
-	g_hFiles[0] = RegisterQueryFile("./../../../appmanifest_10.acf", "steam_found", RES_TYPE_HASH_ANY);
-	g_hFiles[1] = RegisterQueryFile("./../../../appmanifest_10.acf", "steam_not_found", RES_TYPE_MISSING);
+	g_hFiles[0] = RegisterQueryFile(g_sSteamDetectFile, "steam_found", RES_TYPE_HASH_ANY);
+	g_hFiles[1] = RegisterQueryFile(g_sSteamDetectFile, "steam_not_found", RES_TYPE_MISSING);
 
 
 	if (g_sFastDropString[0] != EOS)
@@ -226,9 +228,12 @@ public steam_found(const id)
 		if (g_bIsUserSteamBadKey[id])
 		{
 			log_player_to_file(id, "connected with empty authkey, steamid already is used.");
-			formatex(g_sClientDropString[id],charsmax(g_sClientDropString[]), g_sDropAlreadyFoundString, floatround(g_fTimeOut / 60.0));
-			set_task(0.1, "drop_client_delayed", id);
-			log_to_file("unreal_fakesteamid_detector.log", "[DROP] %s", g_sClientDropString[id]);
+			if (g_sDropAlreadyFoundString[0] != EOS)
+			{
+				formatex(g_sClientDropString[id],charsmax(g_sClientDropString[]), g_sDropAlreadyFoundString, floatround(g_fTimeOut / 60.0));
+				set_task(0.1, "drop_client_delayed", id);
+				log_to_file("unreal_fakesteamid_detector.log", "[DROP] %s", g_sClientDropString[id]);
+			}
 		}
 		else 
 		{
