@@ -26,3 +26,6 @@ drop_fake_steam_string = Please close Steam or use original Steam cs 1.6 client
 hello_fake_steam = true
 hello_fake_steam_string = User '[username]' join with FakeSteam client
 ```
+
+
+Внимание! Рекомендуется изменить стандартный путь проверки Steam на свой уникальный. 
