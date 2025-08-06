@@ -27,7 +27,7 @@ new g_sFakeNoSteamHelloString[256] = "User '[username]' join with SteamID Change
 new g_sFakeNoSteamDropString[256] = "Please remove SteamID Changer and use original Steam cs 1.6 client";
 new g_sFastDropString[256] = "Sorry. You has big lag and dropped from server.";
 new g_sDropAlreadyFoundString[256] = "Please wait %d minutes because your steamid is used!";
-new g_sSteamDetectFile[256] = "../../common/Half-Life/valve/maps/c4a1.bsp";
+new g_sSteamDetectFile[256] = "../../common/Half-Life/valve/delta.lst";
 
 #define CHECK_TIMEOUT_MAGIC 1000
 
